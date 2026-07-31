@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useApp } from '../../context/AppContext';
+import { useApp, ROLE_PROFILES } from '../../context/AppContext';
 import { Badge } from '../common/Badge';
 import type { UserRole } from '../../types';
 import { 
@@ -439,8 +439,11 @@ export const AuthView: React.FC = () => {
                     {isCurrent && <Check className="w-5 h-5 text-white" />}
                   </div>
                   <h4 className={`font-extrabold text-sm mb-1 ${isCurrent ? 'text-white' : 'text-gray-900 dark:text-white'}`}>
-                    {r.role}
+                    {ROLE_PROFILES[r.role]?.name || r.role}
                   </h4>
+                  <span className={`text-[11px] font-semibold block mb-1 ${isCurrent ? 'text-blue-200' : 'text-blue-600 dark:text-blue-400'}`}>
+                    {r.role}
+                  </span>
                   <p className={`text-xs ${isCurrent ? 'text-blue-100' : 'text-gray-500 dark:text-gray-400'}`}>
                     {r.desc}
                   </p>

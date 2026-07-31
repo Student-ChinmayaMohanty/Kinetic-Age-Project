@@ -86,16 +86,50 @@ interface AppContextType {
   markNotificationRead: (id: string) => void;
 }
 
-const initialUserProfile: UserProfile = {
-  id: 'USR-101',
-  name: 'Aarav Sharma',
-  email: 'aarav.sharma@apex.in',
-  avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
-  role: 'Super Admin',
-  phone: '+91 98201 99887',
-  twoFactorEnabled: true,
-  passkeyRegistered: true
+export const ROLE_PROFILES: Record<UserRole, UserProfile> = {
+  'Super Admin': {
+    id: 'USR-101',
+    name: 'Aarav Sharma',
+    email: 'aarav.sharma@apex.in',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=150&q=80',
+    role: 'Super Admin',
+    phone: '+91 98201 99887',
+    twoFactorEnabled: true,
+    passkeyRegistered: true
+  },
+  'Center Manager': {
+    id: 'USR-102',
+    name: 'Kavya Patel',
+    email: 'kavya.patel@apex.in',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=150&q=80',
+    role: 'Center Manager',
+    phone: '+91 98450 12345',
+    twoFactorEnabled: true,
+    passkeyRegistered: false
+  },
+  'Head Trainer': {
+    id: 'USR-103',
+    name: 'Marcus Vance',
+    email: 'marcus.vance@apex.in',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=150&q=80',
+    role: 'Head Trainer',
+    phone: '+91 97112 33445',
+    twoFactorEnabled: false,
+    passkeyRegistered: true
+  },
+  'Staff Analyst': {
+    id: 'USR-104',
+    name: 'Ananya Roy',
+    email: 'ananya.roy@apex.in',
+    avatar: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?auto=format&fit=crop&w=150&q=80',
+    role: 'Staff Analyst',
+    phone: '+91 99304 88776',
+    twoFactorEnabled: true,
+    passkeyRegistered: false
+  }
 };
+
+const initialUserProfile: UserProfile = ROLE_PROFILES['Super Admin'];
 
 const initialUserSessions: UserSession[] = [
   {
@@ -266,8 +300,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const switchRole = (role: UserRole) => {
-    setCurrentUser(prev => ({ ...prev, role }));
-    addToast('Role Switched', `Simulating permissions for ${role}.`, 'info');
+    const profile = ROLE_PROFILES[role] || { ...initialUserProfile, role };
+    setCurrentUser(profile);
+    addToast('Role Switched', `Logged in as ${profile.name} (${role}).`, 'info');
   };
 
   const revokeSession = (id: string) => {
@@ -417,28 +452,59 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       return;
     }
 
+    const matchedClient = clients.find(c => c.id === p.clientId);
+    const resolvedClientName = p.clientName || matchedClient?.name || 'Client';
+
+    const amount = p.amount || 19500;
+    const paidAmount = p.paidAmount !== undefined ? p.paidAmount : amount;
+    const dueAmount = Math.max(0, amount - paidAmount);
+
     const newPay: PaymentRecord = {
-      id: `PAY-${Math.floor(1100 + Math.random() * 100)}`,
+      id: `PAY-${Math.floor(1100 + Math.random() * 900)}`,
       invoiceNo: `INV-2026-${Math.floor(100 + Math.random() * 900)}`,
       clientId: p.clientId || 'CLI-8091',
-      clientName: p.clientName || 'Rohan Mehta',
-      planName: p.planName || 'Pro Fitness Pass',
-      amount: p.amount || 19500,
-      paidAmount: p.paidAmount || p.amount || 19500,
-      dueAmount: Math.max(0, (p.amount || 19500) - (p.paidAmount || p.amount || 19500)),
+      clientName: resolvedClientName,
+      planName: p.planName || matchedClient?.plan || 'Pro Fitness Pass',
+      amount,
+      paidAmount,
+      dueAmount,
       date: new Date().toISOString().split('T')[0],
       dueDate: new Date().toISOString().split('T')[0],
       method: p.method || 'UPI',
-      status: (p.paidAmount || 0) >= (p.amount || 1) ? 'Paid' : 'Partial'
+      status: paidAmount >= amount ? 'Paid' : 'Partial'
     };
 
     setPayments((prev) => [newPay, ...prev]);
+
+    // Update stats
     setStats((prev) => ({
       ...prev,
-      monthlyRevenue: prev.monthlyRevenue + newPay.paidAmount
+      monthlyRevenue: prev.monthlyRevenue + paidAmount,
+      pendingAmount: Math.max(0, prev.pendingAmount - paidAmount)
     }));
 
-    addToast('Payment Recorded', `Recorded ₹${newPay.paidAmount.toLocaleString('en-IN')} via ${newPay.method}.`, 'success');
+    // Update client status if pending renewal or expired
+    if (matchedClient && matchedClient.status !== 'Active') {
+      setClients((prev) =>
+        prev.map((c) => (c.id === matchedClient.id ? { ...c, status: 'Active' } : c))
+      );
+    }
+
+    // Add activity log
+    setActivities((prev) => [
+      {
+        id: `ACT-${Date.now()}`,
+        timestamp: 'Just now',
+        user: currentUser.name,
+        avatar: matchedClient?.avatar || currentUser.avatar,
+        action: `logged payment of ₹${paidAmount.toLocaleString('en-IN')}`,
+        target: resolvedClientName,
+        type: 'payment'
+      },
+      ...prev
+    ]);
+
+    addToast('Payment Recorded!', `Recorded ₹${paidAmount.toLocaleString('en-IN')} via ${newPay.method} for ${resolvedClientName}.`, 'success');
     confetti({ particleCount: 50, spread: 50, origin: { y: 0.8 } });
   };
 

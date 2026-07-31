@@ -7,6 +7,7 @@ import { CommandPalette } from './components/layout/CommandPalette';
 import { ToastContainer } from './components/layout/ToastContainer';
 import { ClientProfileModal } from './components/clients/ClientProfileModal';
 import { AddClientModal } from './components/clients/AddClientModal';
+import { AddPaymentModal } from './components/payments/AddPaymentModal';
 
 import { DashboardView } from './components/dashboard/DashboardView';
 import { ClientListView } from './components/clients/ClientListView';
@@ -16,6 +17,7 @@ import { PaymentsView } from './components/payments/PaymentsView';
 import { ReportsView } from './components/reports/ReportsView';
 import { SettingsView } from './components/settings/SettingsView';
 import { AuthView } from './components/auth/AuthView';
+import { AuthLandingScreen } from './components/auth/AuthLandingScreen';
 
 const MainContent: React.FC = () => {
   const { activeTab } = useApp();
@@ -34,26 +36,39 @@ const MainContent: React.FC = () => {
   );
 };
 
+const MainLayout: React.FC = () => {
+  const { isAuthenticated } = useApp();
+
+  if (!isAuthenticated) {
+    return <AuthLandingScreen />;
+  }
+
+  return (
+    <div className="min-h-screen flex bg-[#FAFAFA] dark:bg-[#0B0F17] text-gray-900 dark:text-gray-100 font-sans transition-colors duration-200 antialiased selection:bg-blue-500 selection:text-white">
+      {/* Desktop Collapsible Sidebar */}
+      <Sidebar />
+
+      {/* Main Application Frame */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
+        <Navbar />
+        <MainContent />
+      </div>
+
+      {/* Floating Controls & Modals */}
+      <MobileNav />
+      <CommandPalette />
+      <ToastContainer />
+      <ClientProfileModal />
+      <AddClientModal />
+      <AddPaymentModal />
+    </div>
+  );
+};
+
 export function App() {
   return (
     <AppProvider>
-      <div className="min-h-screen flex bg-[#FAFAFA] dark:bg-[#0B0F17] text-gray-900 dark:text-gray-100 font-sans transition-colors duration-200 antialiased selection:bg-blue-500 selection:text-white">
-        {/* Desktop Collapsible Sidebar */}
-        <Sidebar />
-
-        {/* Main Application Frame */}
-        <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
-          <Navbar />
-          <MainContent />
-        </div>
-
-        {/* Floating Controls & Modals */}
-        <MobileNav />
-        <CommandPalette />
-        <ToastContainer />
-        <ClientProfileModal />
-        <AddClientModal />
-      </div>
+      <MainLayout />
     </AppProvider>
   );
 }
