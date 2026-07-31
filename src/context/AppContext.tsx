@@ -75,9 +75,11 @@ interface AppContextType {
 
   // Actions
   addClient: (c: Partial<Client>) => void;
-  updateSessionStatus: (id: string, status: Session['status'], notes?: string) => void;
+  updateClient: (clientId: string, updates: Partial<Client>) => void;
+  updateSessionStatus: (id: string, status: Session['status'], notes?: string, caloriesBurned?: number) => void;
   recordPayment: (payment: Partial<PaymentRecord>) => void;
   renewSubscription: (subId: string) => void;
+  resetDataToDefaults: () => void;
   addToast: (title: string, message: string, type?: Toast['type']) => void;
   removeToast: (id: string) => void;
   toasts: Toast[];
@@ -132,6 +134,16 @@ const initialSecurityLogs: SecurityAuditLog[] = [
   { id: 'SEC-104', event: 'Unrecognized Device Login Attempt', timestamp: 'July 25, 2026', ip: '185.220.101.5', status: 'Blocked' }
 ];
 
+function getStored<T>(key: string, fallback: T): T {
+  try {
+    const item = localStorage.getItem(key);
+    return item ? JSON.parse(item) : fallback;
+  } catch (e) {
+    console.error(`Error loading ${key} from localStorage`, e);
+    return fallback;
+  }
+}
+
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -143,17 +155,27 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Authentication State
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(true);
-  const [currentUser, setCurrentUser] = useState<UserProfile>(initialUserProfile);
+  const [currentUser, setCurrentUser] = useState<UserProfile>(() => getStored('kinetic_user', initialUserProfile));
   const [userSessions, setUserSessions] = useState<UserSession[]>(initialUserSessions);
   const [securityLogs] = useState<SecurityAuditLog[]>(initialSecurityLogs);
 
-  const [stats, setStats] = useState<SystemStats>(initialStats);
-  const [clients, setClients] = useState<Client[]>(initialClients);
-  const [sessions, setSessions] = useState<Session[]>(initialSessions);
-  const [payments, setPayments] = useState<PaymentRecord[]>(initialPayments);
-  const [subscriptions, setSubscriptions] = useState<Subscription[]>(initialSubscriptions);
-  const [activities, setActivities] = useState<ActivityLog[]>(initialActivities);
-  const [notifications, setNotifications] = useState<NotificationItem[]>(initialNotifications);
+  const [stats, setStats] = useState<SystemStats>(() => getStored('kinetic_stats', initialStats));
+  const [clients, setClients] = useState<Client[]>(() => getStored('kinetic_clients', initialClients));
+  const [sessions, setSessions] = useState<Session[]>(() => getStored('kinetic_sessions', initialSessions));
+  const [payments, setPayments] = useState<PaymentRecord[]>(() => getStored('kinetic_payments', initialPayments));
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>(() => getStored('kinetic_subscriptions', initialSubscriptions));
+  const [activities, setActivities] = useState<ActivityLog[]>(() => getStored('kinetic_activities', initialActivities));
+  const [notifications, setNotifications] = useState<NotificationItem[]>(() => getStored('kinetic_notifications', initialNotifications));
+
+  // Sync to localStorage
+  useEffect(() => { localStorage.setItem('kinetic_stats', JSON.stringify(stats)); }, [stats]);
+  useEffect(() => { localStorage.setItem('kinetic_clients', JSON.stringify(clients)); }, [clients]);
+  useEffect(() => { localStorage.setItem('kinetic_sessions', JSON.stringify(sessions)); }, [sessions]);
+  useEffect(() => { localStorage.setItem('kinetic_payments', JSON.stringify(payments)); }, [payments]);
+  useEffect(() => { localStorage.setItem('kinetic_subscriptions', JSON.stringify(subscriptions)); }, [subscriptions]);
+  useEffect(() => { localStorage.setItem('kinetic_activities', JSON.stringify(activities)); }, [activities]);
+  useEffect(() => { localStorage.setItem('kinetic_notifications', JSON.stringify(notifications)); }, [notifications]);
+  useEffect(() => { localStorage.setItem('kinetic_user', JSON.stringify(currentUser)); }, [currentUser]);
 
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [isAddClientOpen, setIsAddClientOpen] = useState<boolean>(false);
@@ -340,7 +362,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     confetti({ particleCount: 60, spread: 60, origin: { y: 0.7 } });
   };
 
-  const updateSessionStatus = (id: string, status: Session['status'], notes?: string) => {
+  const updateSessionStatus = (id: string, status: Session['status'], notes?: string, caloriesBurned?: number) => {
     if (!hasPermission('checkin_session')) {
       addToast('Access Denied', 'Authentication & Trainer / Admin role required for session check-ins.', 'danger');
       return;
@@ -350,13 +372,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       prev.map((s) => {
         if (s.id === id) {
           const updated = { ...s, status };
-          if (notes) updated.trainerNotes = notes;
+          if (notes !== undefined) updated.trainerNotes = notes;
+          if (caloriesBurned !== undefined) updated.caloriesBurned = caloriesBurned;
           return updated;
         }
         return s;
       })
     );
     addToast('Session Updated', `Session status changed to ${status}.`, 'info');
+  };
+
+  const updateClient = (clientId: string, updates: Partial<Client>) => {
+    setClients((prev) =>
+      prev.map((c) => (c.id === clientId ? { ...c, ...updates } : c))
+    );
+    if (selectedClient && selectedClient.id === clientId) {
+      setSelectedClient((prev) => (prev ? { ...prev, ...updates } : null));
+    }
+  };
+
+  const resetDataToDefaults = () => {
+    localStorage.removeItem('kinetic_stats');
+    localStorage.removeItem('kinetic_clients');
+    localStorage.removeItem('kinetic_sessions');
+    localStorage.removeItem('kinetic_payments');
+    localStorage.removeItem('kinetic_subscriptions');
+    localStorage.removeItem('kinetic_activities');
+    localStorage.removeItem('kinetic_notifications');
+    localStorage.removeItem('kinetic_user');
+    setStats(initialStats);
+    setClients(initialClients);
+    setSessions(initialSessions);
+    setPayments(initialPayments);
+    setSubscriptions(initialSubscriptions);
+    setActivities(initialActivities);
+    setNotifications(initialNotifications);
+    setCurrentUser(initialUserProfile);
+    addToast('Data Reset', 'All data restored to default initial values.', 'info');
   };
 
   const recordPayment = (p: Partial<PaymentRecord>) => {
@@ -453,9 +505,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         selectedInvoice,
         setSelectedInvoice,
         addClient,
+        updateClient,
         updateSessionStatus,
         recordPayment,
         renewSubscription,
+        resetDataToDefaults,
         addToast,
         removeToast,
         toasts,

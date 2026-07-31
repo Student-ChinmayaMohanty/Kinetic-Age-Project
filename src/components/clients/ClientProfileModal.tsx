@@ -8,16 +8,18 @@ import {
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 
 export const ClientProfileModal: React.FC = () => {
-  const { selectedClient, setSelectedClient, renewSubscription, addToast } = useApp();
+  const { selectedClient, setSelectedClient, renewSubscription, updateClient, addToast } = useApp();
   const [activeTab, setActiveTab] = useState<'overview' | 'sessions' | 'payments' | 'notes'>('overview');
   const [newNote, setNewNote] = useState('');
 
   if (!selectedClient) return null;
 
   const handleAddNote = () => {
-    if (!newNote.trim()) return;
+    if (!newNote.trim() || !selectedClient) return;
+    const existingNotes = selectedClient.notes || '';
+    const updatedNotes = `${existingNotes}\n• [${new Date().toLocaleDateString()}] ${newNote}`;
+    updateClient(selectedClient.id, { notes: updatedNotes });
     addToast('Note Saved', 'Trainer observation saved to client record.', 'success');
-    selectedClient.notes = `${selectedClient.notes}\n• [${new Date().toLocaleDateString()}] ${newNote}`;
     setNewNote('');
   };
 

@@ -24,8 +24,7 @@ export const SessionsView: React.FC = () => {
 
   const handleSaveNotes = () => {
     if (!selectedSession) return;
-    updateSessionStatus(selectedSession.id, selectedSession.status, editNotes);
-    selectedSession.caloriesBurned = editCalories;
+    updateSessionStatus(selectedSession.id, selectedSession.status, editNotes, editCalories);
     setSelectedSession(null);
   };
 
